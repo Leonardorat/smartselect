@@ -1,7 +1,19 @@
-pub struct LinuxAccessibility;
+use atspi::AccessibilityConnection;
+
+pub struct LinuxAccessibility {
+    connection: AccessibilityConnection,
+}
 
 impl LinuxAccessibility {
-    pub async fn connect() -> Result<Self, String> 
+    pub async fn connect() -> Result<Self, atspi::AtspiError> 
+    {
+        let connection =
+            AccessibilityConnection::new().await?;
+
+        Ok(Self {
+            connection,
+        })
+    },
 
     pub async fn current_text(
         &self,

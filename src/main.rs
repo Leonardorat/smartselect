@@ -1,28 +1,93 @@
-mod config;
-mod engine;
-mod linux;
-mod service;
+mod adapters;
+mod core;
 
-use config::Config;
-use engine::SelectionEngine;
-use linux::LinuxAccessibility;
-use service::SmartSelectService;
+use anyhow::Result;
+
+use futures_util::StreamExt;
+
+use atspi::{
+    Event,
+    ObjectEvents,
+};
+
+use atspi::events::object::{
+    TextSelectionChangedEvent,
+};
+
+use adapters::atspi::AtspiAdapter;
+use core::SelectionEngine;
 
 #[tokio::main]
-async fn main() -> Result<(), String> {
-    let config = Config::default();
+async fn main() -> Result<()> {
+    let adapter =
+        AtspiAdapter::connect().await?;
 
     let engine =
-        SelectionEngine::new(config);
+        SelectionEngine::new();
 
-    let accessibility =
-        LinuxAccessibility::connect().await?;
+    adapter
+        .connection()
+        .register_event::<
+            TextSelectionChangedEvent
+        >()
+        .await?;
 
-    let mut service =
-        SmartSelectService::new(
-            engine,
-            accessibility,
-        );
+    let events =
+        adapter.connection().event_stream();
 
-    service.run().await
+    futures_util::pin_mut!(events);
+
+    println!("SmartSelect running");
+
+    while let Some(event) =
+        events.next().await
+    {
+        let event = event?;
+
+        let Event::Object(
+            ObjectEvents::TextSelectionChanged(event)
+        ) = event
+        else {
+            continue;
+        };
+
+        let object = event.item;
+
+        let context =
+            match adapter
+                .read_context(&object)
+                .await
+            {
+                Ok(context) => context,
+
+                Err(error) => {
+                    eprintln!(
+                        "Could not read text object: {error}"
+                    );
+
+                    continue;
+                }
+            };
+
+        let Some(range) =
+            engine.select(&context)
+        else {
+            continue;
+        };
+
+        if let Err(error) =
+            adapter
+                .apply_selection(
+                    &object,
+                    range,
+                )
+                .await
+        {
+            eprintln!(
+                "Could not apply selection: {error}"
+            );
+        }
+    }
+
+    Ok(())
 }
