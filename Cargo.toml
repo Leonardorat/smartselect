@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-atspi = { version = "0.30", features = ["tokio"] }
+atspi = { version = "0.30", default-features = false, features = ["tokio", "proxies", "wrappers", "zbus"] }
+atspi-connection = { version = "0.14", default-features = false, features = ["wrappers"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 futures-util = "0.3"
 async-trait = "0.1"

@@ -3,10 +3,8 @@ use anyhow::{
     Result,
 };
 
-use atspi::{
-    AccessibilityConnection,
-    ObjectRefOwned,
-};
+use atspi::ObjectRefOwned;
+use atspi_connection::AccessibilityConnection;
 
 use atspi::proxy::text::TextProxy;
 
@@ -28,7 +26,33 @@ impl AtspiAdapter {
             connection,
         })
     }
+    //
+    pub async fn should_ignore(
+    &self,
+    object: &ObjectRefOwned,
+) -> Result<bool> {
+    use atspi::zbus::{
+        fdo::DBusProxy,
+        names::BusName,
+    };
 
+    let sender = object
+        .name_as_str()
+        .ok_or_else(|| anyhow!("AT-SPI object has no bus name"))?;
+
+    // Ask the bus daemon for the sender's PID, not the application.
+    let dbus = DBusProxy::new(self.connection.connection()).await?;
+    let pid = dbus
+        .get_connection_unix_process_id(BusName::try_from(sender)?)
+        .await?;
+
+    // Read the process name locally without querying its accessibility API.
+    let process_name =
+        std::fs::read_to_string(format!("/proc/{pid}/comm"))?;
+
+    Ok(process_name.trim().eq_ignore_ascii_case("brave"))
+}
+//
     pub fn connection(
         &self,
     ) -> &AccessibilityConnection {

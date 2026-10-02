@@ -42,7 +42,13 @@ async fn main() -> Result<()> {
     while let Some(event) =
         events.next().await
     {
-        let event = event?;
+        let event = match event {
+    Ok(event) => event,
+    Err(error) => {
+        eprintln!("Ignoring accessibility event error: {error}");
+        continue;
+    }
+};
 
         let Event::Object(
             ObjectEvents::TextSelectionChanged(event)
@@ -52,7 +58,17 @@ async fn main() -> Result<()> {
         };
 
         let object = event.item;
-
+        //
+        match adapter.should_ignore(&object).await {
+    Ok(false) => {}
+    Ok(true) => continue,
+    Err(error) => {
+        // Skip applications whose identity cannot be checked.
+        eprintln!("Skipping unidentified application: {error}");
+        continue;
+    }
+}
+//
         let context =
             match adapter
                 .read_context(&object)
