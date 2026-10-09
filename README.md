@@ -11,7 +11,7 @@
 cargo build --release
 ./target/release/smartselect
 ```
-how to run
+## how to run
 ```bash
 ./target/release/smartselect
 ```
